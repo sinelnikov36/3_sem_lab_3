@@ -366,10 +366,10 @@ int main() {
 
     std::cout << "\nИнициализация тестовых данных..." << std::endl;
     try {
-        bank.addRegularDepositor("Иванов Иван Иванович", 50000.0);
-        bank.addBonusDepositor("Петров Петр Петрович", 120000.0, 5000.0);
-        bank.addRegularDepositor("Сидорова Анна Викторовна", 75000.0);
-        bank.addBonusDepositor("Козлов Василий Алексеевич", 20000.0, 1500.0);
+        bank.addRegularDepositor("Павлов Антон Иванович", 50000.0);
+        bank.addBonusDepositor("Хляка Дании Евгеньевич", 120000.0, 5000.0);
+        bank.addRegularDepositor("Ситник Илья Викторович", 75000.0);
+        bank.addBonusDepositor("Семагин Алексей Алексеевич", 20000.0, 1500.0);
         std::cout << "Тестовые данные загружены\n" << std::endl;
     }
     catch (const std::exception& e) {
