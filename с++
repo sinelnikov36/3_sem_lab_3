@@ -1,0 +1,421 @@
+#define NOMINMAX
+#include <iostream>
+#include <string>
+#include <vector>
+#include <memory>
+#include <algorithm>
+#include <stdexcept>
+#include <limits>
+#include <sstream>
+#include <iomanip>
+#include <clocale>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+class IDepositorStrategy {
+protected:
+    std::string fullName;
+    double baseDeposit;
+
+public:
+    IDepositorStrategy(std::string name, double deposit)
+        : fullName(std::move(name)), baseDeposit(deposit) {
+        if (baseDeposit < 0) {
+            throw std::invalid_argument("Сумма вклада не может быть отрицательной");
+        }
+    }
+
+    virtual ~IDepositorStrategy() = default;
+
+    virtual double getFinalDeposit() const = 0;
+
+    virtual std::string getDepositorType() const = 0;
+
+    virtual void printInfo() const {
+        std::cout << "ФИО: " << fullName
+            << ", Базовый вклад: " << std::fixed << std::setprecision(2)
+            << baseDeposit << " руб.";
+    }
+
+    const std::string& getFullName() const { return fullName; }
+    double getBaseDeposit() const { return baseDeposit; }
+};
+
+class RegularDepositor : public IDepositorStrategy {
+public:
+    RegularDepositor(const std::string& name, double deposit)
+        : IDepositorStrategy(name, deposit) {
+    }
+
+    double getFinalDeposit() const override {
+        return baseDeposit;
+    }
+
+    std::string getDepositorType() const override {
+        return "Обычный";
+    }
+
+    void printInfo() const override {
+        IDepositorStrategy::printInfo();
+        std::cout << ", Тип: Обычный вкладчик" << std::endl;
+    }
+};
+
+class BonusDepositor : public IDepositorStrategy {
+private:
+    double fixedBonus;
+
+public:
+    BonusDepositor(const std::string& name, double deposit, double bonus)
+        : IDepositorStrategy(name, deposit), fixedBonus(bonus) {
+        if (bonus <= 0) {
+            throw std::invalid_argument("Бонус должен быть положительным");
+        }
+    }
+
+    double getFinalDeposit() const override {
+        return baseDeposit + fixedBonus;
+    }
+
+    std::string getDepositorType() const override {
+        return "Бонусный";
+    }
+
+    double getFixedBonus() const { return fixedBonus; }
+
+    void printInfo() const override {
+        IDepositorStrategy::printInfo();
+        std::cout << ", Бонус: " << std::fixed << std::setprecision(2)
+            << fixedBonus << " руб., Итого: "
+            << std::setprecision(2) << getFinalDeposit()
+            << " руб., Тип: Вкладчик с бонусом" << std::endl;
+    }
+};
+
+class Bank {
+private:
+    std::vector<std::shared_ptr<IDepositorStrategy>> depositors;
+
+public:
+    ~Bank() = default;
+
+    void addRegularDepositor(const std::string& name, double deposit) {
+        if (name.empty()) {
+            throw std::invalid_argument("ФИО не может быть пустым");
+        }
+        if (deposit <= 0) {
+            throw std::invalid_argument("Вклад должен быть положительным");
+        }
+
+        depositors.push_back(std::make_shared<RegularDepositor>(name, deposit));
+        std::cout << "Обычный вкладчик добавлен успешно" << std::endl;
+    }
+
+    void addBonusDepositor(const std::string& name, double deposit, double bonus) {
+        if (name.empty()) {
+            throw std::invalid_argument("ФИО не может быть пустым");
+        }
+        if (deposit <= 0) {
+            throw std::invalid_argument("Вклад должен быть положительным");
+        }
+        if (bonus <= 0) {
+            throw std::invalid_argument("Бонус должен быть положительным");
+        }
+
+        depositors.push_back(std::make_shared<BonusDepositor>(name, deposit, bonus));
+        std::cout << "Вкладчик с бонусом добавлен успешно" << std::endl;
+    }
+
+    double calculateTotalDeposits() const {
+        if (depositors.empty()) {
+            throw std::runtime_error("Нет вкладчиков для расчета");
+        }
+
+        double total = 0.0;
+        for (const auto& depositor : depositors) {
+            total += depositor->getFinalDeposit();
+        }
+
+        return total;
+    }
+
+    void printAllDepositors() const {
+        if (depositors.empty()) {
+            std::cout << "Вкладчики отсутствуют" << std::endl;
+            return;
+        }
+
+        std::cout << "\nСписок вкладчиков:" << std::endl;
+        for (size_t i = 0; i < depositors.size(); ++i) {
+            std::cout << (i + 1) << ". ";
+            depositors[i]->printInfo();
+        }
+    }
+
+    size_t getDepositorCount() const {
+        return depositors.size();
+    }
+
+    void printStatistics() const {
+        if (depositors.empty()) {
+            std::cout << "Нет данных для статистики" << std::endl;
+            return;
+        }
+
+        int regularCount = 0;
+        int bonusCount = 0;
+
+        for (const auto& depositor : depositors) {
+            if (depositor->getDepositorType() == "Обычный") {
+                regularCount++;
+            }
+            else {
+                bonusCount++;
+            }
+        }
+
+        std::cout << "\nСтатистика:" << std::endl;
+        std::cout << "Всего вкладчиков: " << depositors.size() << std::endl;
+        std::cout << "Обычных: " << regularCount << std::endl;
+        std::cout << "С бонусом: " << bonusCount << std::endl;
+        std::cout << "Общая сумма вкладов (с учётом бонусов): "
+            << std::fixed << std::setprecision(2)
+            << calculateTotalDeposits() << " руб." << std::endl;
+    }
+
+    void clearAllDepositors() {
+        depositors.clear();
+        std::cout << "Все вкладчики удалены" << std::endl;
+    }
+};
+
+static void clearInputBuffer() {
+    std::cin.clear();
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+}
+
+static bool isValidInteger(const std::string& str, int& result) {
+    if (str.empty() || str.find_first_not_of(" \t\r\n") == std::string::npos) {
+        return false;
+    }
+    std::istringstream iss(str);
+    iss >> result;
+    std::string remainder;
+    iss >> std::ws >> remainder;
+    return iss.eof() && remainder.empty();
+}
+
+static bool isValidDouble(const std::string& str, double& result) {
+    if (str.empty() || str.find_first_not_of(" \t\r\n") == std::string::npos) {
+        return false;
+    }
+    std::string cleaned = str;
+    std::replace(cleaned.begin(), cleaned.end(), ',', '.');
+    std::istringstream iss(cleaned);
+    iss >> result;
+    std::string remainder;
+    iss >> std::ws >> remainder;
+    return iss.eof() && remainder.empty();
+}
+
+static std::string readNonEmptyString(const std::string& prompt) {
+    while (true) {
+        std::cout << prompt;
+        std::string s;
+        std::getline(std::cin, s);
+
+        if (std::cin.fail()) {
+            std::cout << "Ошибка чтения. Повторите ввод." << std::endl;
+            clearInputBuffer();
+            continue;
+        }
+
+        s.erase(0, s.find_first_not_of(" \t\r\n"));
+        s.erase(s.find_last_not_of(" \t\r\n") + 1);
+
+        if (!s.empty()) {
+            return s;
+        }
+        else {
+            std::cout << "Пустая строка недопустима. Повторите ввод." << std::endl;
+        }
+    }
+}
+
+// ИСПРАВЛЕННАЯ ФУНКЦИЯ - теперь работает с UTF-8
+static bool isValidDepositorName(const std::string& name) {
+    if (name.empty() || name.length() > 100) {
+        return false;
+    }
+
+    bool hasLetter = false;
+    for (unsigned char ch : name) {
+        // Проверяем на цифры (запрещены в ФИО)
+        if (ch >= '0' && ch <= '9') {
+            return false;
+        }
+        // Разрешаем буквы латиницы, кириллицу (в UTF-8 это байты >= 128), пробелы, дефисы
+        if (isalpha(ch) || ch >= 128 || ch == ' ' || ch == '-') {
+            if (isalpha(ch) || ch >= 128) {
+                hasLetter = true;
+            }
+        }
+    }
+    return hasLetter;
+}
+
+static std::string readDepositorName(const std::string& prompt) {
+    while (true) {
+        std::string name = readNonEmptyString(prompt);
+        if (isValidDepositorName(name)) {
+            return name;
+        }
+        else {
+            std::cout << "Некорректное ФИО. Используйте только буквы, пробелы, дефисы." << std::endl;
+            std::cout << "Длина должна быть от 1 до 100 символов." << std::endl;
+        }
+    }
+}
+
+static int readIntInRange(const std::string& prompt, int minValue, int maxValue) {
+    while (true) {
+        std::string input = readNonEmptyString(prompt);
+        int value;
+        if (isValidInteger(input, value)) {
+            if (value >= minValue && value <= maxValue) {
+                return value;
+            }
+            else {
+                std::cout << "Значение должно быть в диапазоне ["
+                    << minValue << ", " << maxValue << "]" << std::endl;
+            }
+        }
+        else {
+            std::cout << "Некорректный ввод. Введите целое число от "
+                << minValue << " до " << maxValue << std::endl;
+        }
+    }
+}
+
+static double readPositiveDouble(const std::string& prompt, double minValue = 0.01, double maxValue = 10000000.0) {
+    while (true) {
+        std::string input = readNonEmptyString(prompt);
+        double value;
+        if (isValidDouble(input, value)) {
+            if (value >= minValue && value <= maxValue) {
+                return value;
+            }
+            else {
+                std::cout << "Значение должно быть в диапазоне ["
+                    << minValue << ", " << maxValue << "]" << std::endl;
+            }
+        }
+        else {
+            std::cout << "Некорректный ввод. Введите число от "
+                << minValue << " до " << maxValue << std::endl;
+        }
+    }
+}
+
+static void actionAddRegularDepositor(Bank& bank) {
+    try {
+        std::string name = readDepositorName("Введите ФИО вкладчика: ");
+        double deposit = readPositiveDouble("Введите сумму вклада (руб.): ", 1.0, 100000000.0);
+        bank.addRegularDepositor(name, deposit);
+    }
+    catch (const std::exception& e) {
+        std::cout << "Ошибка: " << e.what() << std::endl;
+    }
+}
+
+static void actionAddBonusDepositor(Bank& bank) {
+    try {
+        std::string name = readDepositorName("Введите ФИО вкладчика: ");
+        double deposit = readPositiveDouble("Введите сумму вклада (руб.): ", 1.0, 100000000.0);
+        double bonus = readPositiveDouble("Введите фиксированный бонус (руб.): ", 1.0, 100000.0);
+        bank.addBonusDepositor(name, deposit, bonus);
+    }
+    catch (const std::exception& e) {
+        std::cout << "Ошибка: " << e.what() << std::endl;
+    }
+}
+
+static void printMenu() {
+    std::cout << "\nМеню Банка:" << std::endl;
+    std::cout << "1. Добавить обычного вкладчика" << std::endl;
+    std::cout << "2. Добавить вкладчика с бонусом" << std::endl;
+    std::cout << "3. Показать всех вкладчиков" << std::endl;
+    std::cout << "4. Показать общую сумму вкладов" << std::endl;
+    std::cout << "5. Показать статистику" << std::endl;
+    std::cout << "6. Очистить список вкладчиков" << std::endl;
+    std::cout << "0. Выход" << std::endl;
+}
+
+int main() {
+    // УСТАНАВЛИВАЕМ КОДИРОВКУ КОНСОЛИ
+#ifdef _WIN32
+    SetConsoleOutputCP(1251);  // Windows-1251 для вывода
+    SetConsoleCP(1251);         // Windows-1251 для ввода
+#endif
+
+    setlocale(LC_ALL, "Russian");
+
+    Bank bank;
+
+    std::cout << "\nИнициализация тестовых данных..." << std::endl;
+    try {
+        bank.addRegularDepositor("Иванов Иван Иванович", 50000.0);
+        bank.addBonusDepositor("Петров Петр Петрович", 120000.0, 5000.0);
+        bank.addRegularDepositor("Сидорова Анна Викторовна", 75000.0);
+        bank.addBonusDepositor("Козлов Василий Алексеевич", 20000.0, 1500.0);
+        std::cout << "Тестовые данные загружены\n" << std::endl;
+    }
+    catch (const std::exception& e) {
+        std::cout << "Ошибка при загрузке тестовых данных: " << e.what() << std::endl;
+    }
+
+    while (true) {
+        try {
+            printMenu();
+            int choice = readIntInRange("Выберите пункт меню: ", 0, 6);
+
+            switch (choice) {
+            case 1:
+                actionAddRegularDepositor(bank);
+                break;
+            case 2:
+                actionAddBonusDepositor(bank);
+                break;
+            case 3:
+                bank.printAllDepositors();
+                break;
+            case 4:
+                try {
+                    std::cout << "\nОбщая сумма вкладов (с учётом бонусов): "
+                        << std::fixed << std::setprecision(2)
+                        << bank.calculateTotalDeposits() << " руб." << std::endl;
+                }
+                catch (const std::exception& e) {
+                    std::cout << "Ошибка: " << e.what() << std::endl;
+                }
+                break;
+            case 5:
+                bank.printStatistics();
+                break;
+            case 6:
+                bank.clearAllDepositors();
+                break;
+            case 0:
+                std::cout << "" << std::endl;
+                return 0;
+            }
+        }
+        catch (const std::exception& e) {
+            std::cout << "Критическая ошибка: " << e.what() << std::endl;
+        }
+    }
+
+    return 0;
+}
